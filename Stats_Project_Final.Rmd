@@ -1,0 +1,239 @@
+---
+title: "Study of influence of day-to-day activities on Obesity Levels"
+author: "Kalyani Jaware, Uttara Ketkar, Aneesh Khole, Sharvari Ghatake, Diksha Jadhav, Minal Pawar"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r}
+# Install and load the required package
+library(gginference)
+library(dplyr)
+library(tidyverse)
+library(plotly)
+library(ggplot2)
+library(BSDA)
+data <- read.csv("Obesity.csv")
+data <- rename(data,Frequent_consumption_of_high_caloric_food = FAVC,Frequency_of_consumption_of_vegetables = FCVC, Number_of_main_meals = NCP, Consumption_of_food_between_meals = CAEC, Consumption_of_water_daily = CH2O, Consumption_of_alcohol = CALC,Calories_consumption_monitoring = SCC, Physical_activity_frequency = FAF, Time_using_technology_devices  = TUE, Transportation_used = MTRANS)
+head(data)
+```
+
+```{r}
+data$obesity_categories <- ifelse(data$NObeyesdad %in% c("Insufficient_Weight", "Normal_Weight"), "Normal", (ifelse(data$NObeyesdad %in% c("Obesity_Type_I", "Obesity_Type_II", "Obesity_Type_III"), "Obese", "Overweight")))
+
+head(data)
+```
+```{r}
+ggplot(data, aes(x = Weight, fill = NObeyesdad)) +
+  geom_density(alpha = 0.5) +
+  labs(title = "Density Plot of Age with Obesity Type",
+       x = "Age",
+       y = "Density") +
+  theme_minimal() +
+  facet_wrap(~NObeyesdad, scales = "free")
+```
+```{r}
+histogram <- plot_ly(data, x = ~obesity_categories, type = "histogram",color = ~family_history_with_overweight, facet_col = ~family_history_with_overweight,colors = c("steelblue","coral")) %>%
+  layout(title = "Histogram of Obesity Type",
+         xaxis = list(title = "Obesity Type"),
+         yaxis = list(title = "Number of people"),barmode = "stack")
+
+
+# Display the histogram
+histogram
+```
+```{r}
+box_plot <- plot_ly(data, y = ~Height, color = ~Gender, type = "violin", box = list(visible = TRUE),colors = c("darkviolet","darkgreen")) %>%
+  layout(title = "Box Plot of Height Gender-wise",
+         yaxis = list(title = "Height"),
+         xaxis = list(title = "Gender"))
+
+# Display the box plot
+box_plot
+
+```
+
+```{r}
+age_breaks <- c(0,25, 34,61)
+age_labels <- c("youth (<25)","Young Adults (25-34)","Adults (>=35)")
+data$AgeGroup <- cut(data$Age, breaks = age_breaks, labels = age_labels)
+
+# avg_data <- aggregate(Time_using_technology_devices ~ AgeGroup, data = data, FUN = mean)
+
+line_chart <- plot_ly(
+  type = "box",
+  x = data$AgeGroup,
+  y = data$Time_using_technology_devices,
+)
+line_chart <- line_chart %>% layout(title = "Boxplot of time using technology devices among various age groups",yaxis = list(title ="Age Groups"),yaxis = list(title ="Time_using_technology_devices"))
+
+line_chart
+```
+```{r}
+heatmap_ggplot <- ggplot(data, aes(x = AgeGroup, y = Transportation_used, fill = Physical_activity_frequency)) +
+  geom_tile(fun = "max") +
+
+  labs(title = "Heatmap of Physical Activity frequency with respect to Age Group and Mode of transportation", x = "Age Groups", y = "Transportation Modes Used", fill = "Values")
+
+# Display the ggplot2 heatmap
+print(heatmap_ggplot)
+```
+```{r}
+pie_chart <- plot_ly(
+  data,
+  labels = ~Calories_consumption_monitoring,
+  type = "pie"
+)
+
+
+pie_chart <- pie_chart %>%
+  layout(title = "Pie Chart of Percentage of people monitoring calorie consumtion")
+
+# Display the pie chart
+pie_chart
+```
+```{r}
+data$BMI = data$Weight/(data$Height**2)
+
+ggplot()+geom_point(aes(x=data$Age,y=data$BMI,color = data$NObeyesdad))
+```
+```{r}
+
+# 1. Null hypothesis (H0): Mean height of Males and Females is Equal
+# Alternative hypothesis (Ha): There is a difference between mean heights of Male and Female
+
+# Conducting a two-tailed t-test
+Male <- data %>% filter(Gender == "Male") %>% pull(Height)
+summary(Male)
+
+Female <- data %>% filter(Gender == "Female") %>% pull(Height)
+summary(Female)
+
+result <- t.test(x=Male, y=Female, alternative = "two.sided")
+result
+
+```
+```{r}
+
+ggttest(result)
+
+```
+
+```{r}
+# 2. Null hypothesis (H0): Proportion of smokers is more than 0.5
+# Alternative hypothesis (Ha): Proportion of smokers is less than 0.5
+
+data$SMOKE_Encoded <- ifelse(data$SMOKE == "yes", 1, 0)
+
+# Conducting a one-tailed proportion test
+prop_test_smokers <- prop.test(sum(data$SMOKE_Encoded), length(data$SMOKE_Encoded), p = 0.5, alternative = "less")
+
+print(prop_test_smokers)
+```
+
+```{r}
+# 3. Null hypothesis (H0): Family history of obesity has almost no influence on Obesity level
+# Alternative hypothesis (Ha): Family history of obesity influences Obesity level
+
+# A bit about the chi squared test - To determine whether there is a significant correlation between two categorical variables, this test for independence is used. It compares the observed frequencies to those that would be expected under the assumption of independence using a contingency table. After normalizing the squared differences between the observed and expected frequencies, the test statistic Chi-squared (X²) is computed.
+
+data$obesity_categories <- ifelse(data$NObeyesdad %in% c("Insufficient_Weight", "Normal_Weight"), "Normal", (ifelse(data$NObeyesdad %in% c("Obesity_Type_I", "Obesity_Type_II", "Obesity_Type_III"), "Obese", "Overweight")))
+
+# Conducting a chi-squared test
+contingency_table <- table(data$obesity_categories, data$family_history_with_overweight)
+chi_squared_result <- chisq.test(contingency_table)
+
+print("Chi-squared Test for Independence for Obesity category and Family history of Obesity:")
+print(chi_squared_result)
+```
+```{r}
+
+ggchisqtest(chi_squared_result)
+
+```
+
+```{r}
+#Statistic calculation of weight and height
+correlation <- cor(data$Weight, data$Height)
+print(paste("Correlation between weight and height:", correlation))
+
+print(summary(data$BMI))
+```
+
+```{r}
+#4. Null hypothesis (H0): Mean of people not monitoring calorie intake have higher BMI than the  population mean
+
+# Alternative hypothesis (Ha): Mean of people monitoring calorie intake have lower BMI than the  population mean
+
+# Conducting a one-tailed two sample t-test
+
+Monitoring_no <- data %>% filter(Calories_consumption_monitoring == "no") %>% pull(BMI)
+summary(Monitoring_no)
+
+Monitoring_yes <- data %>% filter(Calories_consumption_monitoring == "yes") %>% pull(BMI)
+summary(Monitoring_yes)
+
+result_monitoring <- t.test(x=Monitoring_no,y=Monitoring_yes, alternative = "less",mu=mean(data$BMI))
+result_monitoring
+
+```
+
+```{r}
+
+ggttest(result_monitoring) 
+
+```
+
+```{r}
+#5. Null hypothesis (H0): Frequency of alcohol consumption has almost no influence on Obesity level
+# Alternative hypothesis (Ha): Frequency of alcohol consumption influences Obesity level
+
+# Conducting a chi-squared test
+contingency_table <- table(data$obesity_categories, data$Consumption_of_alcohol)
+chi_squared_result <- chisq.test(contingency_table)
+
+print("Chi-squared Test for Independence for Obesity category and Family history of Obesity:")
+print(chi_squared_result)
+
+```
+
+```{r}
+
+ggchisqtest(chi_squared_result)
+
+```
+
+```{r}
+# Classifying task
+
+# Split the data set into training and testing sets
+set.seed(456)
+train_indices <- sample(1:nrow(data), 0.7 * nrow(data))
+train_data <- data[train_indices, ]
+test_data <- data[-train_indices, ]
+```
+
+```{r}
+# Train the Decision tree classifier
+library(rpart)
+
+print(names(data))
+tree_model <- rpart(NObeyesdad ~ Gender +  Age + Height + Weight+ family_history_with_overweight +           Frequent_consumption_of_high_caloric_food + Frequency_of_consumption_of_vegetables + Consumption_of_water_daily+ Number_of_main_meals + Consumption_of_food_between_meals + SMOKE+ Calories_consumption_monitoring +Physical_activity_frequency+ Time_using_technology_devices + Consumption_of_alcohol  +Transportation_used, data = train_data)
+```
+```{r}
+
+predictions <- predict(tree_model, test_data, type = "class")
+
+# Calculate accuracy
+correct_predictions <- sum(predictions == test_data$NObeyesdad)
+total_samples <- length(predictions)
+accuracy <- correct_predictions / total_samples
+
+# Print accuracy
+print(paste("Accuracy:", round(accuracy * 100, 2), "%"))
+```
