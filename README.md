@@ -1,4 +1,4 @@
-# Study of influence of day-to-day activities on Obesity Levels
+# A Study on the influence of day-to-day activities on Obesity Levels
 
 ### Introduction
 
